@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>UPI QR Generator — Styled</title>
+    <link rel="stylesheet" href="style.css" />
+    <meta name="description" content="Create a scannable UPI QR with quick amount & note presets. 100% client-side." />
+</head>
+
+<body>
+    <header class="site-header">
+        <h1>UPI QR Generator</h1>
+        <p class="muted">Create a scannable UPI QR with quick amount & note presets. (Client-side)</p>
+    </header>
+
+    <main class="container">
+        <div class="layout">
+            <!-- LEFT: Controls -->
+            <div class="col-left">
+                <!-- Payee -->
+                <section class="card">
+                    <h2 class="card-title">Payee</h2>
+                    <div class="grid g-3">
+                        <label class="field">
+                            <span>UPI ID (VPA) *</span>
+                            <input id="vpa" placeholder="name@bank" autocomplete="on" />
+                        </label>
+                        <label class="field">
+                            <span>Payee Name</span>
+                            <input id="payeeName" placeholder="e.g., Ashish Ranjan" />
+                        </label>
+                        <label class="field">
+                            <span>Transaction Ref (optional)</span>
+                            <input id="txnRef" placeholder="auto or leave blank" />
+                        </label>
+                    </div>
+                </section>
+
+                <!-- Payment -->
+                <section class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Payment</h2>
+                    </div>
+
+                    <div class="grid g-3">
+                        <label class="field">
+                            <span>Amount (₹)</span>
+                            <input id="amount" type="number" min="0" step="0.01" placeholder="0.00" />
+                        </label>
+
+                        <label class="field">
+                            <span>Note (Message)</span>
+                            <input id="note" maxlength="60" placeholder="e.g., Consultation Fees" />
+                        </label>
+
+                    </div>
+
+                    <div class="presetsWrapper">
+                        <small class="muted">Tap a preset to fill quickly.</small>
+                        <div class="presets">
+
+                            <div class="chips" id="amountChips"></div>
+                            <div class="chips" id="noteChips"></div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- RIGHT: QR Preview & Actions -->
+            <div class="col-right">
+                <section class="card sticky">
+                    <div class="card-header">
+                        <h2 class="card-title">QR Preview</h2>
+                        <small class="muted">Updates live. Use Download or Print for sharing.</small>
+                    </div>
+
+                    <div class="qr-wrap">
+                        <canvas id="qrCanvas" width="420" height="420" class="qr" aria-label="UPI QR preview"></canvas>
+                    </div>
+
+                    <div class="summary">
+                        <div>
+                            <span class="muted">UPI Link</span>
+                            <code id="upiLinkPreview" title="Click to copy"></code>
+                        </div>
+                    </div>
+
+                    <div class="actions">
+                        <button id="downloadBtn">Download PNG</button>
+                        <button id="copyLinkBtn" class="secondary">Copy UPI Link</button>
+                        <button id="printBtn" class="secondary">Print</button>
+                        <button id="resetBtn" class="danger">Reset</button>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <small>&copy; 2025 | <a href="https://www.ashishranjan.net" target="_blank">Ashish Ranjan</a></small>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
