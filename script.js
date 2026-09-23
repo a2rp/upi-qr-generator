@@ -1,229 +1,778 @@
-/* ===========================================================
-   UPI QR Generator — Styled (Vanilla JS)
-   - Builds UPI payment URI
-   - Generates QR via a public QR PNG endpoint (CORS OK)
-   - Draws QR on canvas for download/print
-   - Amount & Note presets
-   =========================================================== */
+const elements = {
+    upiId: document.getElementById("upiId"),
+    payeeName: document.getElementById("payeeName"),
+    amount: document.getElementById("amount"),
 
-const dom = {
-    vpa: qs("#vpa"),
-    payeeName: qs("#payeeName"),
-    txnRef: qs("#txnRef"),
-    amount: qs("#amount"),
-    note: qs("#note"),
-    qrCanvas: qs("#qrCanvas"),
-    upiLinkPreview: qs("#upiLinkPreview"),
-    downloadBtn: qs("#downloadBtn"),
-    copyLinkBtn: qs("#copyLinkBtn"),
-    printBtn: qs("#printBtn"),
-    resetBtn: qs("#resetBtn"),
-    amountChips: qs("#amountChips"),
-    noteChips: qs("#noteChips"),
+    transactionReference: document.getElementById("transactionReference"),
+
+    note: document.getElementById("note"),
+
+    upiIdError: document.getElementById("upiIdError"),
+    amountError: document.getElementById("amountError"),
+
+    qrPlaceholder: document.getElementById("qrPlaceholder"),
+    qrCode: document.getElementById("qrCode"),
+    qrStatus: document.getElementById("qrStatus"),
+
+    upiLinkPreview: document.getElementById("upiLinkPreview"),
+
+    copyButton: document.getElementById("copyButton"),
+    downloadButton: document.getElementById("downloadButton"),
+    printButton: document.getElementById("printButton"),
+    resetButton: document.getElementById("resetButton"),
+
+    currentYear: document.getElementById("currentYear"),
+    toast: document.getElementById("toast"),
 };
 
-const DEFAULT_AMOUNTS = [99, 199, 499, 999];
-const DEFAULT_NOTES = ["Thanks", "Fees", "Subscription", "Donation"];
+const amountPresetButtons = document.querySelectorAll("[data-amount]");
 
-/* ------------------------------- Init ------------------------------- */
-let state = {
-    vpa: "",
-    payeeName: "",
-    txnRef: "",
-    amount: "",
-    note: "",
-    amountPresets: [...DEFAULT_AMOUNTS],
-    notePresets: [...DEFAULT_NOTES],
+const notePresetButtons = document.querySelectorAll("[data-note]");
+
+const UPI_ID_PATTERN = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+$/;
+
+const QR_SIZE = 520;
+const EXPORT_PADDING = 48;
+
+let qrInstance = null;
+let currentUpiUri = "";
+let updateTimer = null;
+let toastTimer = null;
+
+const normalizeValue = (value) => {
+    return value.trim();
 };
 
-init();
+const escapeHtml = (value) => {
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+};
 
-function init() {
-    // hydrate UI
-    dom.vpa.value = state.vpa;
-    dom.payeeName.value = state.payeeName;
-    dom.txnRef.value = state.txnRef;
-    dom.amount.value = state.amount;
-    dom.note.value = state.note;
+const formatDate = (date = new Date()) => {
+    const day = String(date.getDate()).padStart(2, "0");
 
-    renderChips();
-
-    ["vpa", "payeeName", "txnRef", "amount", "note"].forEach((k) =>
-        dom[k].addEventListener("input", onFormChange)
-    );
-
-    dom.downloadBtn.addEventListener("click", onDownload);
-    dom.copyLinkBtn.addEventListener("click", onCopyLink);
-    dom.printBtn.addEventListener("click", () => window.print());
-    dom.resetBtn.addEventListener("click", onReset);
-
-    dom.upiLinkPreview.addEventListener("click", onCopyLink);
-
-    drawQR();
-}
-
-/* ------------------------------ Helpers ----------------------------- */
-function qs(s) {
-    return document.querySelector(s);
-}
-
-// Permissive VPA check: name@bank (alnum . _ - allowed both sides)
-function isValidVPA(vpa) {
-    return /^[a-zA-Z0-9.\-_]{2,}@[a-zA-Z0-9.\-_]{2,}$/.test(vpa);
-}
-
-function buildUpiUri() {
-    const params = new URLSearchParams();
-    if (state.vpa) params.set("pa", state.vpa);
-    if (state.payeeName) params.set("pn", state.payeeName);
-    if (state.amount) params.set("am", Number(state.amount).toFixed(2));
-    if (state.note) params.set("tn", state.note);
-    params.set("cu", "INR");
-    if (state.txnRef) params.set("tr", state.txnRef);
-    return `upi://pay?${params.toString()}`;
-}
-
-function qrPngUrl(data, size = 420) {
-    // Public QR endpoint with permissive CORS; perfect for canvas
-    const base = "https://api.qrserver.com/v1/create-qr-code/";
-    const q = new URLSearchParams({
-        size: `${size}x${size}`,
-        data,
-        margin: "0",
+    const month = date.toLocaleString("en-US", {
+        month: "short",
     });
-    return `${base}?${q.toString()}`;
-}
 
-/* ------------------------------ Events ------------------------------ */
-function onFormChange() {
-    state.vpa = dom.vpa.value.trim();
-    state.payeeName = dom.payeeName.value.trim();
-    state.txnRef = dom.txnRef.value.trim();
-    state.amount = dom.amount.value.trim();
-    state.note = dom.note.value.trim();
-    drawQR();
-}
+    const year = date.getFullYear();
 
-function onAmountChip(v) {
-    state.amount = String(v);
-    dom.amount.value = state.amount;
-    drawQR();
-}
-function onNoteChip(v) {
-    state.note = v;
-    dom.note.value = state.note;
-    drawQR();
-}
+    return `${day} ${month} ${year}`;
+};
 
-function onReset() {
-    if (!confirm("Reset all fields?")) return;
-    state.vpa = "";
-    state.payeeName = "";
-    state.txnRef = "";
-    state.amount = "";
-    state.note = "";
-    dom.vpa.value = "";
-    dom.payeeName.value = "";
-    dom.txnRef.value = "";
-    dom.amount.value = "";
-    dom.note.value = "";
-    drawQR();
-}
+const isValidUpiId = (value) => {
+    const upiId = normalizeValue(value);
 
-async function onCopyLink() {
-    const link = buildUpiUri();
-    try {
-        await navigator.clipboard.writeText(link);
-        toast("UPI link copied.");
-    } catch {
-        window.prompt("Copy UPI link:", link);
+    if (!upiId) {
+        return false;
     }
-}
 
-/* ------------------------------ Render ------------------------------ */
-function renderChips() {
-    dom.amountChips.innerHTML = "";
-    state.amountPresets.forEach((v) => {
-        const b = document.createElement("button");
-        b.className = "chip";
-        b.type = "button";
-        b.textContent = `₹${v}`;
-        b.addEventListener("click", () => onAmountChip(v));
-        dom.amountChips.appendChild(b);
-    });
+    if (upiId.length < 5 || upiId.length > 100) {
+        return false;
+    }
 
-    dom.noteChips.innerHTML = "";
-    state.notePresets.forEach((v) => {
-        const b = document.createElement("button");
-        b.className = "chip";
-        b.type = "button";
-        b.textContent = v;
-        b.addEventListener("click", () => onNoteChip(v));
-        dom.noteChips.appendChild(b);
-    });
-}
+    return UPI_ID_PATTERN.test(upiId);
+};
 
-function drawQR() {
-    const canvas = dom.qrCanvas;
-    const ctx = canvas.getContext("2d");
-    const size = canvas.width; // 420
+const validateUpiId = () => {
+    const value = normalizeValue(elements.upiId.value);
 
-    // Clear + white bg (best for scanners)
-    ctx.clearRect(0, 0, size, size);
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, size, size);
+    if (!value) {
+        elements.upiId.classList.remove("invalid");
 
-    // Require valid VPA
-    if (!state.vpa || !isValidVPA(state.vpa)) {
-        drawMessage(ctx, size, "Enter a valid UPI ID (name@bank)");
-        dom.upiLinkPreview.textContent = "";
+        elements.upiIdError.hidden = true;
+        elements.upiIdError.textContent = "";
+
+        return false;
+    }
+
+    if (!isValidUpiId(value)) {
+        elements.upiId.classList.add("invalid");
+
+        elements.upiIdError.textContent =
+            "Enter a valid UPI ID such as name@bank.";
+
+        elements.upiIdError.hidden = false;
+
+        return false;
+    }
+
+    elements.upiId.classList.remove("invalid");
+
+    elements.upiIdError.hidden = true;
+    elements.upiIdError.textContent = "";
+
+    return true;
+};
+
+const validateAmount = () => {
+    const value = elements.amount.value.trim();
+
+    if (!value) {
+        elements.amount.classList.remove("invalid");
+
+        elements.amountError.hidden = true;
+        elements.amountError.textContent = "";
+
+        return true;
+    }
+
+    const amount = Number(value);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+        elements.amount.classList.add("invalid");
+
+        elements.amountError.textContent = "Enter an amount greater than zero.";
+
+        elements.amountError.hidden = false;
+
+        return false;
+    }
+
+    const decimalPart = value.split(".")[1];
+
+    if (decimalPart && decimalPart.length > 2) {
+        elements.amount.classList.add("invalid");
+
+        elements.amountError.textContent =
+            "Use no more than two decimal places.";
+
+        elements.amountError.hidden = false;
+
+        return false;
+    }
+
+    elements.amount.classList.remove("invalid");
+
+    elements.amountError.hidden = true;
+    elements.amountError.textContent = "";
+
+    return true;
+};
+
+const formatAmount = () => {
+    const value = elements.amount.value.trim();
+
+    if (!value) {
+        return "";
+    }
+
+    const amount = Number(value);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+        return "";
+    }
+
+    return amount.toFixed(2);
+};
+
+const buildUpiUri = () => {
+    const params = new URLSearchParams();
+
+    params.set("pa", normalizeValue(elements.upiId.value));
+
+    const payeeName = normalizeValue(elements.payeeName.value);
+
+    const reference = normalizeValue(elements.transactionReference.value);
+
+    const amount = formatAmount();
+
+    const note = normalizeValue(elements.note.value);
+
+    if (payeeName) {
+        params.set("pn", payeeName);
+    }
+
+    if (reference) {
+        params.set("tr", reference);
+    }
+
+    if (amount) {
+        params.set("am", amount);
+    }
+
+    if (note) {
+        params.set("tn", note);
+    }
+
+    params.set("cu", "INR");
+
+    return `upi://pay?${params.toString()}`;
+};
+
+const setStatus = (text, type = "") => {
+    elements.qrStatus.textContent = text;
+
+    elements.qrStatus.classList.remove("ready", "error");
+
+    if (type) {
+        elements.qrStatus.classList.add(type);
+    }
+};
+
+const setActionState = (enabled) => {
+    elements.copyButton.disabled = !enabled;
+    elements.downloadButton.disabled = !enabled;
+    elements.printButton.disabled = !enabled;
+};
+
+const showToast = (message, type = "success") => {
+    window.clearTimeout(toastTimer);
+
+    elements.toast.textContent = message;
+
+    elements.toast.classList.remove("visible", "success", "error");
+
+    elements.toast.classList.add("visible", type);
+
+    toastTimer = window.setTimeout(() => {
+        elements.toast.classList.remove("visible");
+    }, 2200);
+};
+
+const clearQr = () => {
+    if (qrInstance) {
+        qrInstance.clear();
+        qrInstance = null;
+    }
+
+    elements.qrCode.innerHTML = "";
+    elements.qrCode.hidden = true;
+
+    elements.qrPlaceholder.hidden = false;
+
+    currentUpiUri = "";
+
+    elements.upiLinkPreview.textContent = "upi://pay";
+
+    setActionState(false);
+};
+
+const generateQr = () => {
+    const upiValid = validateUpiId();
+    const amountValid = validateAmount();
+
+    if (!upiValid || !amountValid) {
+        clearQr();
+
+        if (elements.upiId.value.trim()) {
+            setStatus("Invalid", "error");
+        } else {
+            setStatus("Waiting");
+        }
+
         return;
     }
 
-    const upi = buildUpiUri();
-    dom.upiLinkPreview.textContent = upi;
+    const upiUri = buildUpiUri();
 
-    // Fetch QR as PNG and draw
-    const src = qrPngUrl(upi, size);
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-        ctx.drawImage(img, 0, 0, size, size);
-    };
-    img.onerror = () => {
-        drawMessage(ctx, size, "QR render failed. Check connection.");
-    };
-    img.src = src;
-}
+    clearQr();
 
-/* -------------------------- Canvas helpers -------------------------- */
-function drawMessage(ctx, size, text) {
-    ctx.fillStyle = "#f2f2f2";
-    ctx.fillRect(0, 0, size, size);
-    ctx.fillStyle = "#333";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.font = "16px system-ui, -apple-system, Segoe UI, Arial";
-    ctx.fillText(text, size / 2, size / 2);
-}
+    elements.qrPlaceholder.hidden = true;
+    elements.qrCode.hidden = false;
 
-/* ------------------------------ Actions ----------------------------- */
-function onDownload() {
+    try {
+        qrInstance = new QRCode(elements.qrCode, {
+            text: upiUri,
+            width: QR_SIZE,
+            height: QR_SIZE,
+            colorDark: "#050505",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.M,
+        });
+
+        currentUpiUri = upiUri;
+
+        elements.upiLinkPreview.textContent = upiUri;
+
+        setActionState(true);
+        setStatus("Ready", "ready");
+    } catch {
+        clearQr();
+
+        setStatus("Error", "error");
+
+        showToast("Unable to generate the QR code.", "error");
+    }
+};
+
+const scheduleQrUpdate = () => {
+    window.clearTimeout(updateTimer);
+
+    updateTimer = window.setTimeout(generateQr, 120);
+};
+
+const copyUpiLink = async () => {
+    if (!currentUpiUri) {
+        return;
+    }
+
+    try {
+        await navigator.clipboard.writeText(currentUpiUri);
+
+        showToast("UPI payment link copied.");
+    } catch {
+        const textarea = document.createElement("textarea");
+
+        textarea.value = currentUpiUri;
+
+        textarea.setAttribute("readonly", "");
+
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+
+        document.body.appendChild(textarea);
+
+        textarea.select();
+
+        const copied = document.execCommand("copy");
+
+        textarea.remove();
+
+        if (copied) {
+            showToast("UPI payment link copied.");
+        } else {
+            showToast("Unable to copy the UPI link.", "error");
+        }
+    }
+};
+
+const getQrCanvas = () => {
+    return elements.qrCode.querySelector("canvas");
+};
+
+const getQrImage = () => {
+    return elements.qrCode.querySelector("img");
+};
+
+const getRawQrDataUrl = () => {
+    const canvas = getQrCanvas();
+
+    if (canvas) {
+        return canvas.toDataURL("image/png");
+    }
+
+    const image = getQrImage();
+
+    if (image && image.src && image.src.startsWith("data:image")) {
+        return image.src;
+    }
+
+    return "";
+};
+
+const createPaddedQrDataUrl = () => {
+    const sourceCanvas = getQrCanvas();
+
+    if (sourceCanvas) {
+        const exportCanvas = document.createElement("canvas");
+
+        const size = sourceCanvas.width + EXPORT_PADDING * 2;
+
+        exportCanvas.width = size;
+        exportCanvas.height = size;
+
+        const context = exportCanvas.getContext("2d");
+
+        context.fillStyle = "#ffffff";
+
+        context.fillRect(0, 0, size, size);
+
+        context.drawImage(sourceCanvas, EXPORT_PADDING, EXPORT_PADDING);
+
+        return exportCanvas.toDataURL("image/png");
+    }
+
+    const sourceUrl = getRawQrDataUrl();
+
+    return sourceUrl;
+};
+
+const downloadQr = () => {
+    if (!currentUpiUri) {
+        return;
+    }
+
+    const dataUrl = createPaddedQrDataUrl();
+
+    if (!dataUrl) {
+        showToast("QR image is not ready yet.", "error");
+
+        return;
+    }
+
+    const upiId = normalizeValue(elements.upiId.value)
+        .replace(/[^a-zA-Z0-9_-]/g, "-")
+        .replace(/-+/g, "-");
+
     const link = document.createElement("a");
-    const safeVpa = (state.vpa || "upi").replace(/[^a-z0-9@._-]/gi, "_");
-    const amount = state.amount ? `_${Number(state.amount).toFixed(2)}` : "";
-    link.download = `upi_qr_${safeVpa}${amount}.png`;
-    link.href = dom.qrCanvas.toDataURL("image/png");
-    link.click();
-}
 
-function toast(msg) {
-    const el = document.createElement("div");
-    el.textContent = msg;
-    el.style.cssText = `
-    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
-    background: rgba(20,20,20,0.95); color: #eaeaea; border: 1px solid #2a2a2a;
-    padding: 10px 14px; border-radius: 10px; z-index: 9999; font: 14px system-ui;`;
-    document.body.appendChild(el);
-    setTimeout(() => el.remove(), 1400);
-}
+    link.href = dataUrl;
+
+    link.download = `${upiId || "upi"}-qr-code.png`;
+
+    document.body.appendChild(link);
+
+    link.click();
+
+    link.remove();
+
+    showToast("QR code downloaded.");
+};
+
+const printQr = () => {
+    if (!currentUpiUri) {
+        return;
+    }
+
+    const dataUrl = createPaddedQrDataUrl();
+
+    if (!dataUrl) {
+        showToast("QR image is not ready yet.", "error");
+
+        return;
+    }
+
+    const printWindow = window.open("", "_blank", "width=760,height=820");
+
+    if (!printWindow) {
+        showToast("Allow pop-ups to print the QR code.", "error");
+
+        return;
+    }
+
+    const payee =
+        normalizeValue(elements.payeeName.value) ||
+        normalizeValue(elements.upiId.value);
+
+    const amount = formatAmount();
+
+    const note = normalizeValue(elements.note.value);
+
+    const reference = normalizeValue(elements.transactionReference.value);
+
+    const upiId = normalizeValue(elements.upiId.value);
+
+    const printedDate = formatDate(new Date());
+
+    printWindow.document.write(`
+        <!doctype html>
+
+        <html lang="en">
+            <head>
+                <meta charset="UTF-8" />
+
+                <meta
+                    name="viewport"
+                    content="width=device-width, initial-scale=1.0"
+                />
+
+                <title>UPI QR Code</title>
+
+                <style>
+                    * {
+                        margin: 0;
+                        padding: 0;
+                        box-sizing: border-box;
+                    }
+
+                    @page {
+                        size: auto;
+                        margin: 16mm;
+                    }
+
+                    body {
+                        display: grid;
+                        place-items: center;
+
+                        min-height: 100vh;
+
+                        padding: 30px;
+
+                        color: #111111;
+                        background: #ffffff;
+
+                        font-family:
+                            Arial,
+                            sans-serif;
+                    }
+
+                    .printCard {
+                        width: min(
+                            520px,
+                            100%
+                        );
+
+                        padding: 28px;
+
+                        border:
+                            1px solid
+                            #dddddd;
+
+                        border-radius: 16px;
+
+                        text-align: center;
+                    }
+
+                    .label {
+                        color: #777777;
+
+                        font-size: 11px;
+                        font-weight: 700;
+
+                        letter-spacing:
+                            0.12em;
+
+                        text-transform:
+                            uppercase;
+                    }
+
+                    .date {
+                        margin-top: 6px;
+
+                        color: #777777;
+
+                        font-size: 12px;
+                    }
+
+                    .qr {
+                        display: block;
+
+                        width: min(
+                            420px,
+                            100%
+                        );
+
+                        margin:
+                            24px auto 0;
+
+                        object-fit: contain;
+                    }
+
+                    h1 {
+                        margin-top: 22px;
+
+                        font-size: 23px;
+                    }
+
+                    .upi {
+                        margin-top: 6px;
+
+                        color: #555555;
+
+                        font-size: 13px;
+                    }
+
+                    .amount {
+                        margin-top: 15px;
+
+                        font-size: 22px;
+                        font-weight: 700;
+                    }
+
+                    .details {
+                        display: grid;
+                        gap: 5px;
+
+                        margin-top: 16px;
+
+                        color: #555555;
+
+                        font-size: 12px;
+                        line-height: 1.5;
+                    }
+
+                    .hint {
+                        margin-top: 22px;
+
+                        color: #777777;
+
+                        font-size: 11px;
+                    }
+
+                    @media print {
+                        body {
+                            min-height: auto;
+                            padding: 0;
+                        }
+
+                        .printCard {
+                            border: 0;
+                        }
+                    }
+                </style>
+            </head>
+
+            <body>
+                <main class="printCard">
+                    <p class="label">
+                        UPI Payment QR
+                    </p>
+
+                    <p class="date">
+                        ${escapeHtml(printedDate)}
+                    </p>
+
+                    <img
+                        class="qr"
+                        src="${dataUrl}"
+                        alt="UPI payment QR code"
+                    />
+
+                    <h1>
+                        ${escapeHtml(payee)}
+                    </h1>
+
+                    <p class="upi">
+                        ${escapeHtml(upiId)}
+                    </p>
+
+                    ${
+                        amount
+                            ? `
+                                <p class="amount">
+                                    ₹${escapeHtml(amount)}
+                                </p>
+                            `
+                            : ""
+                    }
+
+                    <div class="details">
+                        ${
+                            reference
+                                ? `
+                                    <p>
+                                        Reference:
+                                        ${escapeHtml(reference)}
+                                    </p>
+                                `
+                                : ""
+                        }
+
+                        ${
+                            note
+                                ? `
+                                    <p>
+                                        ${escapeHtml(note)}
+                                    </p>
+                                `
+                                : ""
+                        }
+                    </div>
+
+                    <p class="hint">
+                        Verify all payment details before
+                        completing the transaction.
+                    </p>
+                </main>
+            </body>
+        </html>
+    `);
+
+    printWindow.document.close();
+
+    const image = printWindow.document.querySelector(".qr");
+
+    const startPrint = () => {
+        printWindow.focus();
+
+        window.setTimeout(() => {
+            printWindow.print();
+        }, 100);
+    };
+
+    if (image.complete) {
+        startPrint();
+    } else {
+        image.addEventListener("load", startPrint, {
+            once: true,
+        });
+    }
+};
+
+const resetGenerator = () => {
+    elements.upiId.value = "";
+    elements.payeeName.value = "";
+    elements.amount.value = "";
+    elements.transactionReference.value = "";
+    elements.note.value = "";
+
+    elements.upiId.classList.remove("invalid");
+
+    elements.amount.classList.remove("invalid");
+
+    elements.upiIdError.hidden = true;
+    elements.amountError.hidden = true;
+
+    elements.upiIdError.textContent = "";
+    elements.amountError.textContent = "";
+
+    clearQr();
+
+    setStatus("Waiting");
+
+    elements.upiId.focus();
+
+    showToast("Generator reset.");
+};
+
+const handleInput = () => {
+    scheduleQrUpdate();
+};
+
+[
+    elements.upiId,
+    elements.payeeName,
+    elements.amount,
+    elements.transactionReference,
+    elements.note,
+].forEach((element) => {
+    element.addEventListener("input", handleInput);
+});
+
+elements.upiId.addEventListener("blur", validateUpiId);
+
+elements.amount.addEventListener("blur", () => {
+    if (validateAmount() && elements.amount.value.trim()) {
+        elements.amount.value = formatAmount();
+
+        scheduleQrUpdate();
+    }
+});
+
+amountPresetButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+        elements.amount.value = button.dataset.amount;
+
+        scheduleQrUpdate();
+
+        elements.amount.focus();
+    });
+});
+
+notePresetButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+        elements.note.value = button.dataset.note;
+
+        scheduleQrUpdate();
+
+        elements.note.focus();
+    });
+});
+
+elements.copyButton.addEventListener("click", copyUpiLink);
+
+elements.downloadButton.addEventListener("click", downloadQr);
+
+elements.printButton.addEventListener("click", printQr);
+
+elements.resetButton.addEventListener("click", resetGenerator);
+
+elements.currentYear.textContent = new Date().getFullYear();
+
+clearQr();
+setStatus("Waiting");

@@ -1,108 +1,478 @@
 <!doctype html>
 <html lang="en">
+    <head>
+        <meta charset="UTF-8" />
 
-<head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>UPI QR Generator — Styled</title>
-    <link rel="stylesheet" href="style.css" />
-    <meta name="description" content="Create a scannable UPI QR with quick amount & note presets. 100% client-side." />
-</head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-<body>
-    <header class="site-header">
-        <h1>UPI QR Generator</h1>
-        <p class="muted">Create a scannable UPI QR with quick amount & note presets. (Client-side)</p>
-    </header>
+        <title>UPI QR Generator | Create UPI Payment QR Codes</title>
 
-    <main class="container">
-        <div class="layout">
-            <!-- LEFT: Controls -->
-            <div class="col-left">
-                <!-- Payee -->
-                <section class="card">
-                    <h2 class="card-title">Payee</h2>
-                    <div class="grid g-3">
-                        <label class="field">
-                            <span>UPI ID (VPA) *</span>
-                            <input id="vpa" placeholder="name@bank" autocomplete="on" />
-                        </label>
-                        <label class="field">
-                            <span>Payee Name</span>
-                            <input id="payeeName" placeholder="e.g., Ashish Ranjan" />
-                        </label>
-                        <label class="field">
-                            <span>Transaction Ref (optional)</span>
-                            <input id="txnRef" placeholder="auto or leave blank" />
-                        </label>
-                    </div>
-                </section>
+        <meta
+            name="description"
+            content="Create UPI payment QR codes directly in your browser. Add a UPI ID, payee name, amount, note, and transaction reference, then copy, download, or print the QR code."
+        />
 
-                <!-- Payment -->
-                <section class="card">
-                    <div class="card-header">
-                        <h2 class="card-title">Payment</h2>
-                    </div>
+        <meta name="author" content="Ashish Ranjan" />
 
-                    <div class="grid g-3">
-                        <label class="field">
-                            <span>Amount (₹)</span>
-                            <input id="amount" type="number" min="0" step="0.01" placeholder="0.00" />
-                        </label>
+        <meta name="theme-color" content="#080808" />
 
-                        <label class="field">
-                            <span>Note (Message)</span>
-                            <input id="note" maxlength="60" placeholder="e.g., Consultation Fees" />
-                        </label>
+        <meta name="color-scheme" content="dark" />
 
-                    </div>
+        <link rel="icon" type="image/x-icon" href="./assets/favicon.ico" />
 
-                    <div class="presetsWrapper">
-                        <small class="muted">Tap a preset to fill quickly.</small>
-                        <div class="presets">
+        <link rel="canonical" href="https://a2rp.github.io/upi-qr-generator/" />
 
-                            <div class="chips" id="amountChips"></div>
-                            <div class="chips" id="noteChips"></div>
-                        </div>
-                    </div>
-                </section>
+        <meta property="og:type" content="website" />
+
+        <meta property="og:title" content="UPI QR Generator" />
+
+        <meta
+            property="og:description"
+            content="Create UPI payment QR codes directly in your browser with local QR generation."
+        />
+
+        <meta
+            property="og:url"
+            content="https://a2rp.github.io/upi-qr-generator/"
+        />
+
+        <meta
+            property="og:image"
+            content="https://a2rp.github.io/upi-qr-generator/assets/preview.png"
+        />
+
+        <meta property="og:image:width" content="1200" />
+
+        <meta property="og:image:height" content="630" />
+
+        <meta
+            property="og:image:alt"
+            content="UPI QR Generator website preview"
+        />
+
+        <meta name="twitter:card" content="summary_large_image" />
+
+        <meta name="twitter:title" content="UPI QR Generator" />
+
+        <meta
+            name="twitter:description"
+            content="Create UPI payment QR codes directly in your browser."
+        />
+
+        <meta
+            name="twitter:image"
+            content="https://a2rp.github.io/upi-qr-generator/assets/preview.png"
+        />
+
+        <link rel="stylesheet" href="./style.css" />
+    </head>
+
+    <body>
+        <header class="header">
+            <div class="header__inner">
+                <a class="brand" href="./" aria-label="UPI QR Generator home">
+                    <img
+                        class="brand__logo"
+                        src="./assets/logo.png"
+                        alt=""
+                        aria-hidden="true"
+                    />
+
+                    <span class="brand__content">
+                        <strong>UPI QR Generator</strong>
+                        <span>Payment QR Utility</span>
+                    </span>
+                </a>
+
+                <a
+                    class="header__github"
+                    href="https://github.com/a2rp/upi-qr-generator"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    View on GitHub
+                </a>
             </div>
+        </header>
 
-            <!-- RIGHT: QR Preview & Actions -->
-            <div class="col-right">
-                <section class="card sticky">
-                    <div class="card-header">
-                        <h2 class="card-title">QR Preview</h2>
-                        <small class="muted">Updates live. Use Download or Print for sharing.</small>
-                    </div>
+        <main class="main">
+            <section class="intro" aria-labelledby="page-title">
+                <p class="label">UPI Payment Utility</p>
 
-                    <div class="qr-wrap">
-                        <canvas id="qrCanvas" width="420" height="420" class="qr" aria-label="UPI QR preview"></canvas>
-                    </div>
+                <h1 id="page-title">Create a payment QR in seconds.</h1>
 
-                    <div class="summary">
-                        <div>
-                            <span class="muted">UPI Link</span>
-                            <code id="upiLinkPreview" title="Click to copy"></code>
+                <p class="intro__text">
+                    Enter your payment details and generate a UPI QR code
+                    directly in your browser. QR generation stays local and does
+                    not require a remote QR service.
+                </p>
+            </section>
+
+            <section class="generator" aria-label="UPI QR Generator">
+                <div class="generator__controls">
+                    <section class="card">
+                        <div class="card__header">
+                            <div>
+                                <p class="card__label">Payee</p>
+                                <h2>Payment destination</h2>
+                            </div>
+
+                            <span class="card__step">01</span>
                         </div>
-                    </div>
 
-                    <div class="actions">
-                        <button id="downloadBtn">Download PNG</button>
-                        <button id="copyLinkBtn" class="secondary">Copy UPI Link</button>
-                        <button id="printBtn" class="secondary">Print</button>
-                        <button id="resetBtn" class="danger">Reset</button>
-                    </div>
-                </section>
+                        <div class="field">
+                            <label for="upiId">
+                                UPI ID
+                                <span aria-hidden="true">*</span>
+                            </label>
+
+                            <input
+                                id="upiId"
+                                name="upiId"
+                                type="text"
+                                placeholder="name@bank"
+                                autocomplete="off"
+                                spellcheck="false"
+                                aria-describedby="upiIdHelp upiIdError"
+                            />
+
+                            <p id="upiIdHelp" class="field__help">
+                                Example: ashish@upi
+                            </p>
+
+                            <p
+                                id="upiIdError"
+                                class="field__error"
+                                role="alert"
+                                hidden
+                            ></p>
+                        </div>
+
+                        <div class="field">
+                            <label for="payeeName"> Payee Name </label>
+
+                            <input
+                                id="payeeName"
+                                name="payeeName"
+                                type="text"
+                                placeholder="Ashish Ranjan"
+                                autocomplete="name"
+                            />
+                        </div>
+                    </section>
+
+                    <section class="card">
+                        <div class="card__header">
+                            <div>
+                                <p class="card__label">Payment</p>
+                                <h2>Transaction details</h2>
+                            </div>
+
+                            <span class="card__step">02</span>
+                        </div>
+
+                        <div class="field">
+                            <label for="amount"> Amount </label>
+
+                            <div class="amountInput">
+                                <span
+                                    class="amountInput__symbol"
+                                    aria-hidden="true"
+                                >
+                                    ₹
+                                </span>
+
+                                <input
+                                    id="amount"
+                                    name="amount"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    inputmode="decimal"
+                                    placeholder="0.00"
+                                    aria-describedby="amountError"
+                                />
+                            </div>
+
+                            <p
+                                id="amountError"
+                                class="field__error"
+                                role="alert"
+                                hidden
+                            ></p>
+
+                            <div class="presets" aria-label="Amount presets">
+                                <button
+                                    type="button"
+                                    class="preset"
+                                    data-amount="100"
+                                >
+                                    ₹100
+                                </button>
+
+                                <button
+                                    type="button"
+                                    class="preset"
+                                    data-amount="250"
+                                >
+                                    ₹250
+                                </button>
+
+                                <button
+                                    type="button"
+                                    class="preset"
+                                    data-amount="500"
+                                >
+                                    ₹500
+                                </button>
+
+                                <button
+                                    type="button"
+                                    class="preset"
+                                    data-amount="1000"
+                                >
+                                    ₹1000
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label for="transactionReference">
+                                Transaction Reference
+                            </label>
+
+                            <input
+                                id="transactionReference"
+                                name="transactionReference"
+                                type="text"
+                                placeholder="Optional transaction reference"
+                                autocomplete="off"
+                            />
+                        </div>
+
+                        <div class="field">
+                            <label for="note"> Payment Note </label>
+
+                            <textarea
+                                id="note"
+                                name="note"
+                                rows="3"
+                                placeholder="Optional payment note"
+                            ></textarea>
+
+                            <div
+                                class="presets"
+                                aria-label="Payment note presets"
+                            >
+                                <button
+                                    type="button"
+                                    class="preset"
+                                    data-note="Payment"
+                                >
+                                    Payment
+                                </button>
+
+                                <button
+                                    type="button"
+                                    class="preset"
+                                    data-note="Thanks"
+                                >
+                                    Thanks
+                                </button>
+
+                                <button
+                                    type="button"
+                                    class="preset"
+                                    data-note="Order payment"
+                                >
+                                    Order
+                                </button>
+
+                                <button
+                                    type="button"
+                                    class="preset"
+                                    data-note="Services"
+                                >
+                                    Services
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="privacyNote">
+                        <strong>Local QR generation</strong>
+
+                        <p>
+                            QR generation is handled in your browser using a
+                            local QR library. Payment details are not sent to a
+                            third-party QR generation service.
+                        </p>
+                    </section>
+                </div>
+
+                <aside class="preview">
+                    <section class="card previewCard">
+                        <div class="card__header">
+                            <div>
+                                <p class="card__label">Preview</p>
+                                <h2>UPI QR Code</h2>
+                            </div>
+
+                            <span
+                                id="qrStatus"
+                                class="status"
+                                aria-live="polite"
+                            >
+                                Waiting
+                            </span>
+                        </div>
+
+                        <div id="qrFrame" class="qrFrame">
+                            <div id="qrPlaceholder" class="qrPlaceholder">
+                                <img
+                                    src="./assets/logo.png"
+                                    alt=""
+                                    aria-hidden="true"
+                                />
+
+                                <strong>Enter a valid UPI ID</strong>
+
+                                <span> Your QR code will appear here. </span>
+                            </div>
+
+                            <div
+                                id="qrCode"
+                                class="qrCode"
+                                aria-label="Generated UPI QR code"
+                                hidden
+                            ></div>
+                        </div>
+
+                        <div class="upiLink">
+                            <span class="upiLink__label">
+                                UPI Payment Link
+                            </span>
+
+                            <code id="upiLinkPreview"> upi://pay </code>
+                        </div>
+
+                        <div class="actions">
+                            <button
+                                id="copyButton"
+                                class="button button--secondary"
+                                type="button"
+                                disabled
+                            >
+                                Copy UPI Link
+                            </button>
+
+                            <button
+                                id="downloadButton"
+                                class="button button--primary"
+                                type="button"
+                                disabled
+                            >
+                                Download PNG
+                            </button>
+
+                            <button
+                                id="printButton"
+                                class="button button--secondary"
+                                type="button"
+                                disabled
+                            >
+                                Print QR
+                            </button>
+
+                            <button
+                                id="resetButton"
+                                class="button button--quiet"
+                                type="button"
+                            >
+                                Reset
+                            </button>
+                        </div>
+
+                        <p class="previewCard__note">
+                            Verify the UPI ID and payment details before sharing
+                            or using the QR code.
+                        </p>
+                    </section>
+                </aside>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <div class="footer__inner">
+                <div>
+                    <strong class="footer__title"> UPI QR Generator </strong>
+
+                    <p class="footer__copyright">
+                        Copyright &copy;
+                        <span id="currentYear"></span>
+                        <a
+                            href="https://www.ashishranjan.net/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            Ashish Ranjan
+                        </a>
+                    </p>
+                </div>
+
+                <nav class="footer__links" aria-label="External links">
+                    <a
+                        href="https://www.ashishranjan.net"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        Portfolio
+                    </a>
+
+                    <a
+                        href="https://github.com/a2rp"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        GitHub
+                    </a>
+
+                    <a
+                        href="https://codepen.io/ash1198"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        CodePen
+                    </a>
+
+                    <a
+                        href="https://www.linkedin.com/in/aashishranjan"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        LinkedIn
+                    </a>
+
+                    <a
+                        href="https://a2rp-donation-page.netlify.app/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        Support my work
+                    </a>
+                </nav>
             </div>
-        </div>
-    </main>
+        </footer>
 
-    <footer class="site-footer">
-        <small>&copy; 2025 | <a href="https://www.ashishranjan.net" target="_blank">Ashish Ranjan</a></small>
-    </footer>
+        <div
+            id="toast"
+            class="toast"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+        ></div>
 
-    <script src="script.js"></script>
-</body>
-
+        <script src="./assets/vendor/qrcode.min.js"></script>
+        <script src="./script.js"></script>
+    </body>
 </html>
