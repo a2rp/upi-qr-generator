@@ -33,6 +33,7 @@ const UPI_ID_PATTERN = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+$/;
 
 const QR_SIZE = 520;
 const EXPORT_PADDING = 48;
+const MAX_SAFE_PAYMENT_CENTS = String(Number.MAX_SAFE_INTEGER);
 
 let qrInstance = null;
 let currentUpiUri = "";
@@ -78,11 +79,46 @@ const isValidUpiId = (value) => {
     return UPI_ID_PATTERN.test(upiId);
 };
 
+const parseAmountCents = (value) => {
+    const match = value.match(/^(?:(\d+)(?:\.(\d{0,2}))?|\.(\d{1,2}))$/);
+
+    if (!match) {
+        return {
+            ok: false,
+            error: "Use a standard amount with no more than two decimal places.",
+        };
+    }
+
+    const wholeRupees = (match[1] || "0").replace(/^0+(?=\d)/, "");
+    const paise = (match[2] ?? match[3] ?? "").padEnd(2, "0");
+    const cents = `${wholeRupees}${paise}`.replace(/^0+(?=\d)/, "");
+
+    if (cents === "0") {
+        return {
+            ok: false,
+            error: "Enter an amount of at least ₹0.01.",
+        };
+    }
+
+    if (
+        cents.length > MAX_SAFE_PAYMENT_CENTS.length
+        || (cents.length === MAX_SAFE_PAYMENT_CENTS.length && cents > MAX_SAFE_PAYMENT_CENTS)
+    ) {
+        return {
+            ok: false,
+            error: "That amount is too large to represent accurately.",
+        };
+    }
+
+    return { ok: true, wholeRupees, paise };
+};
+
 const validateUpiId = () => {
     const value = normalizeValue(elements.upiId.value);
 
     if (!value) {
         elements.upiId.classList.remove("invalid");
+        elements.upiId.setAttribute("aria-invalid", "false");
 
         elements.upiIdError.hidden = true;
         elements.upiIdError.textContent = "";
@@ -92,6 +128,7 @@ const validateUpiId = () => {
 
     if (!isValidUpiId(value)) {
         elements.upiId.classList.add("invalid");
+        elements.upiId.setAttribute("aria-invalid", "true");
 
         elements.upiIdError.textContent =
             "Enter a valid UPI ID such as name@bank.";
@@ -102,6 +139,7 @@ const validateUpiId = () => {
     }
 
     elements.upiId.classList.remove("invalid");
+    elements.upiId.setAttribute("aria-invalid", "false");
 
     elements.upiIdError.hidden = true;
     elements.upiIdError.textContent = "";
@@ -114,6 +152,7 @@ const validateAmount = () => {
 
     if (!value) {
         elements.amount.classList.remove("invalid");
+        elements.amount.setAttribute("aria-invalid", "false");
 
         elements.amountError.hidden = true;
         elements.amountError.textContent = "";
@@ -121,32 +160,19 @@ const validateAmount = () => {
         return true;
     }
 
-    const amount = Number(value);
+    const parsedAmount = parseAmountCents(value);
 
-    if (!Number.isFinite(amount) || amount <= 0) {
+    if (!parsedAmount.ok) {
         elements.amount.classList.add("invalid");
-
-        elements.amountError.textContent = "Enter an amount greater than zero.";
-
-        elements.amountError.hidden = false;
-
-        return false;
-    }
-
-    const decimalPart = value.split(".")[1];
-
-    if (decimalPart && decimalPart.length > 2) {
-        elements.amount.classList.add("invalid");
-
-        elements.amountError.textContent =
-            "Use no more than two decimal places.";
-
+        elements.amount.setAttribute("aria-invalid", "true");
+        elements.amountError.textContent = parsedAmount.error;
         elements.amountError.hidden = false;
 
         return false;
     }
 
     elements.amount.classList.remove("invalid");
+    elements.amount.setAttribute("aria-invalid", "false");
 
     elements.amountError.hidden = true;
     elements.amountError.textContent = "";
@@ -161,13 +187,13 @@ const formatAmount = () => {
         return "";
     }
 
-    const amount = Number(value);
+    const parsedAmount = parseAmountCents(value);
 
-    if (!Number.isFinite(amount) || amount <= 0) {
+    if (!parsedAmount.ok) {
         return "";
     }
 
-    return amount.toFixed(2);
+    return `${parsedAmount.wholeRupees}.${parsedAmount.paise}`;
 };
 
 const buildUpiUri = () => {
@@ -302,6 +328,8 @@ const generateQr = () => {
 
 const scheduleQrUpdate = () => {
     window.clearTimeout(updateTimer);
+    clearQr();
+    setStatus(elements.upiId.value.trim() ? "Updating" : "Waiting");
 
     updateTimer = window.setTimeout(generateQr, 120);
 };
@@ -325,13 +353,17 @@ const copyUpiLink = async () => {
         textarea.style.position = "fixed";
         textarea.style.opacity = "0";
 
-        document.body.appendChild(textarea);
+        let copied = false;
 
-        textarea.select();
-
-        const copied = document.execCommand("copy");
-
-        textarea.remove();
+        try {
+            document.body.appendChild(textarea);
+            textarea.select();
+            copied = document.execCommand("copy");
+        } catch {
+            copied = false;
+        } finally {
+            textarea.remove();
+        }
 
         if (copied) {
             showToast("UPI payment link copied.");
@@ -695,6 +727,8 @@ const printQr = () => {
 };
 
 const resetGenerator = () => {
+    window.clearTimeout(updateTimer);
+
     elements.upiId.value = "";
     elements.payeeName.value = "";
     elements.amount.value = "";
@@ -702,8 +736,10 @@ const resetGenerator = () => {
     elements.note.value = "";
 
     elements.upiId.classList.remove("invalid");
+    elements.upiId.setAttribute("aria-invalid", "false");
 
     elements.amount.classList.remove("invalid");
+    elements.amount.setAttribute("aria-invalid", "false");
 
     elements.upiIdError.hidden = true;
     elements.amountError.hidden = true;
